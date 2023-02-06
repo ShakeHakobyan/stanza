@@ -317,6 +317,18 @@ en_sample is the toy dataset included with stanza-train
   https://github.com/stanfordnlp/stanza-train
   this is not meant for any kind of actual NER use
 
+ArmTDP-NER is an Armenian NER dataset
+  - https://github.com/myavrum/ArmTDP-NER.git
+    ArmTDP-NER: The corpus was developed by the ArmTDP team led by Marat M. Yavrumyan
+    at the Yerevan State University by the collaboration of "Armenia National SDG Innovation Lab"
+    and "UC Berkley's Armenian Linguists' network".
+  - in $NERBASE, make a "armtdp" directory, then git clone the repo there
+    mkdir -p $NERBASE/armtdp
+    cd $NERBASE/armtdp
+    git clone https://github.com/myavrum/ArmTDP-NER.git
+  - Then run
+    python3 -m stanza.utils.datasets.ner.prepare_ner_dataset hy_armtdp
+
 """
 
 import glob
@@ -350,6 +362,7 @@ import stanza.utils.datasets.ner.prepare_ner_file as prepare_ner_file
 import stanza.utils.datasets.ner.suc_to_iob as suc_to_iob
 import stanza.utils.datasets.ner.suc_conll_to_iob as suc_conll_to_iob
 from stanza.utils.datasets.ner.utils import convert_bio_to_json, get_tags, read_tsv, write_dataset
+from stanza.utils.datasets.ner.convert_hy_armtdp import convert_hy_armtdp
 
 SHARDS = ('train', 'dev', 'test')
 
@@ -938,6 +951,17 @@ def process_masakhane(paths, dataset_name):
 
 def process_toy_dataset(paths, short_name):
     convert_bio_to_json(os.path.join(paths["NERBASE"], "English-SAMPLE"), paths["NER_DATA_DIR"], short_name)
+def process_armtdp(paths, short_name):
+    assert short_name == 'hy_armtdp'
+    base_input_path = os.path.join(paths["NERBASE"], "armtdp", "ArmTDP-NER")
+    base_output_path = paths["NER_DATA_DIR"]
+    convert_hy_armtdp(base_input_path, base_output_path, short_name)
+    for shard in SHARDS:
+        input_filename = os.path.join(base_output_path, f'{short_name}.{shard}.tsv')
+        if not os.path.exists(input_filename):
+            raise FileNotFoundError('Cannot find %s component of %s in %s' % (shard, short_name, input_filename))
+        output_filename = os.path.join(base_output_path, '%s.%s.json' % (short_name, shard))
+        prepare_ner_file.process_dataset(input_filename, output_filename)
 
 DATASET_MAPPING = {
     "bn_daffodil":       process_bn_daffodil,
@@ -960,6 +984,7 @@ DATASET_MAPPING = {
     "sv_suc3shuffle":    process_sv_suc3shuffle,
     "tr_starlang":       process_starlang,
     "th_lst20":          process_lst20,
+    "hy_armtdp":         process_armtdp,
 }
 
 def main(dataset_name):
