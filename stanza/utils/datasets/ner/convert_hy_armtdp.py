@@ -6,17 +6,19 @@ The dataset is here:
 https://github.com/myavrum/ArmTDP-NER.git
 """
 
+import argparse
 import os
 import json
 import re
 import stanza
 import random
-nlp = stanza.Pipeline(lang='hy', processors='tokenize')
+from tqdm import tqdm
+nlp_hy = stanza.Pipeline(lang='hy', processors='tokenize')
 
 
 def read_data(path: str) -> list:
     """
-    Reads Armenian data file
+    Takes a full path to the Armenian ner dataset
 
     Returns list of dictionaries, where each dictionary represents
     a paragraph's information (text, labels, etc.)
@@ -26,58 +28,72 @@ def read_data(path: str) -> list:
     return paragraphs
 
 
-def filter_unicode_broken_characters(paragraphs: list) -> list:
+def filter_unicode_broken_characters(text: str) -> str:
     """
-    Removes all '\u202c' unicode characters in texts
-    TODO: why?
+    Removes all unicode characters in text
     """
-    for paragraph in paragraphs:
-        paragraph['text'] = re.sub('\u202c', '', paragraph['text'])
+    return re.sub(r'\\u[A-Za-z0-9]{4}', '', text)
 
 
-def format_sentence_as_beios(sentence, labels) -> list:
-    sentence_toc = ''
-    current_label = []
-    for token in sentence.tokens:
-        if current_label:
-            tag = current_label[2]
-            if token.end_char == current_label[1]:
-                sentence_toc += token.text + '\tE-' + tag + '\n'
-                current_label = []
-            else:
-                sentence_toc += token.text + '\tI-' + tag + '\n'
-        else:
-            current_label = get_label(token.start_char, labels)
-            if current_label:
-                tag = current_label[2]
-                if token.start_char == current_label[0] and token.end_char == current_label[1]:
-                    sentence_toc += token.text + '\tS-' + tag + '\n'
-                    current_label = []
-                elif token.start_char == current_label[0]:
-                    sentence_toc += token.text + '\tB-' + tag + '\n'
-            else:
-                sentence_toc += token.text + '\tO' + '\n'
-                current_label = []
-    return sentence_toc[:-1]
-
-
-def get_label(tok_start_char: int, labels: list) -> list:
+def get_label(tok_start_char: int, tok_end_char: int, labels: list) -> list:
+    """
+    Returns the label that corresponds to the token
+    """
     for label in labels:
-        if label[0] == tok_start_char:
+        if label[0] <= tok_start_char and label[1] >= tok_end_char:
             return label
     return []
 
 
-def convert_to_bioes(paragraphs):
-    beios_sents = []
-    for paragraph in paragraphs:
-        doc = nlp(paragraph['text'])
+def format_sentences(paragraphs: list) -> list:
+    """
+    Takes a list of paragraphs and returns a list of sentences,
+    where each sentence is a list of tokens along with their respective entity tags.
+    """
+    sentences = []
+    for paragraph in tqdm(paragraphs):
+        doc = nlp_hy(filter_unicode_broken_characters(paragraph['text']))
         for sentence in doc.sentences:
-            beios_sents.append(format_sentence_as_beios(sentence, paragraph['labels']))
+            sentence_ents = []
+            entity = []
+            for token in sentence.tokens:
+                label = get_label(token.start_char, token.end_char, paragraph['labels'])
+                if label:
+                    entity.append(token.text)
+                    if token.end_char == label[1]:
+                        sentence_ents.append({'tokens': entity,
+                                              'tag': label[2]})
+                        entity = []
+                else:
+                    sentence_ents.append({'tokens': [token.text],
+                                          'tag': 'O'})
+            sentences.append(sentence_ents)
+    return sentences
+
+
+def convert_to_bioes(sentences: list) -> list:
+    """
+    Рeturns a list of strings where each string represents a sentence in BIOES format
+    """
+    beios_sents = []
+    for sentence in tqdm(sentences):
+        sentence_toc = ''
+        for ent in sentence:
+            if ent['tag'] == 'O':
+                sentence_toc += ent['tokens'][0] + '\tO' + '\n'
+            else:
+                if len(ent['tokens']) == 1:
+                    sentence_toc += ent['tokens'][0] + '\tS-' + ent['tag'] + '\n'
+                else:
+                    sentence_toc += ent['tokens'][0] + '\tB-' + ent['tag'] + '\n'
+                    for token in ent['tokens'][1:-1]:
+                        sentence_toc += token + '\tI-' + ent['tag'] + '\n'
+                    sentence_toc += ent['tokens'][-1] + '\tE-' + ent['tag'] + '\n'
+        beios_sents.append(sentence_toc)
     return beios_sents
 
 
-def write_sentences_to_file_(sents, filename):
+def write_sentences_to_file(sents, filename):
     print(f"Writing {len(sents)} sentences to {filename}")
     with open(filename, 'w') as outfile:
         for sent in sents:
@@ -85,6 +101,10 @@ def write_sentences_to_file_(sents, filename):
 
 
 def train_test_dev_split(sents, base_output_path, short_name, train_fraction=0.7, dev_fraction=0.15):
+    """
+    Takes in a list of sentences and splits them into training, dev, and test sets
+    Writes each set to a separate file with write_sentences_to_file
+    """
     num = len(sents)
     train_num = int(num * train_fraction)
     dev_num = int(num * dev_fraction)
@@ -99,13 +119,21 @@ def train_test_dev_split(sents, base_output_path, short_name, train_fraction=0.7
     batches = [train_sents, dev_sents, test_sents]
     filenames = [f'{short_name}.train.tsv', f'{short_name}.dev.tsv', f'{short_name}.test.tsv']
     for batch, filename in zip(batches, filenames):
-        write_sentences_to_file_(batch, os.path.join(base_output_path, filename))
+        write_sentences_to_file(batch, os.path.join(base_output_path, filename))
 
 
-def convert_hy_armtdp(base_input_path, base_output_path, short_name):
+def convert_dataset(base_input_path, base_output_path, short_name):
     paragraphs = read_data(os.path.join(base_input_path, 'ArmNER-HY.json1'))
-    filter_unicode_broken_characters(paragraphs)
-    beios_sentences = convert_to_bioes(paragraphs)
+    taged_sentences = format_sentences(paragraphs)
+    beios_sentences = convert_to_bioes(taged_sentences)
     train_test_dev_split(beios_sentences, base_output_path, short_name)
 
 
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input_path', type=str, default="/armtdp/ArmTDP-NER", help="Where to find input file")
+    parser.add_argument('--output_path', type=str, default="/armtdp/ArmTDP-NER/data", help="Where to output the results")
+    parser.add_argument('--short_name', type=str, default="hy_armtdp", help="Language and dataset identifier")
+    args = parser.parse_args()
+
+    convert_dataset(args.input_path, args.output_path, args.short_name)

@@ -361,8 +361,9 @@ import stanza.utils.datasets.ner.convert_nkjp as convert_nkjp
 import stanza.utils.datasets.ner.prepare_ner_file as prepare_ner_file
 import stanza.utils.datasets.ner.suc_to_iob as suc_to_iob
 import stanza.utils.datasets.ner.suc_conll_to_iob as suc_conll_to_iob
+import stanza.utils.datasets.ner.convert_hy_armtdp as convert_hy_armtdp
 from stanza.utils.datasets.ner.utils import convert_bio_to_json, get_tags, read_tsv, write_dataset
-from stanza.utils.datasets.ner.convert_hy_armtdp import convert_hy_armtdp
+
 
 SHARDS = ('train', 'dev', 'test')
 
@@ -955,7 +956,7 @@ def process_armtdp(paths, short_name):
     assert short_name == 'hy_armtdp'
     base_input_path = os.path.join(paths["NERBASE"], "armtdp", "ArmTDP-NER")
     base_output_path = paths["NER_DATA_DIR"]
-    convert_hy_armtdp(base_input_path, base_output_path, short_name)
+    convert_hy_armtdp.convert_dataset(base_input_path, base_output_path, short_name)
     for shard in SHARDS:
         input_filename = os.path.join(base_output_path, f'{short_name}.{shard}.tsv')
         if not os.path.exists(input_filename):
