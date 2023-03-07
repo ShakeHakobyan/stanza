@@ -123,6 +123,12 @@ BERT = {
     # herbert-large-cased (dev/test): 92.25/91.62
     # sdadas/polish-roberta-large-v2 (dev/test): 92.66/91.22
     "pl": "allegro/herbert-base-cased",
+
+    # https://huggingface.co/xlm-roberta-base
+    # Scores by entity on 18 labels:
+    # no bert : 86.68
+    # xlm-roberta-base : 89.31
+    "hy": "xlm-roberta-base",
 }
 
 def build_argparse():
