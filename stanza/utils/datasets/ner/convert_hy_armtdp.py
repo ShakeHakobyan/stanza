@@ -18,10 +18,11 @@ nlp_hy = stanza.Pipeline(lang='hy', processors='tokenize')
 
 def read_data(path: str) -> list:
     """
-    Takes a full path to the Armenian ner dataset
+    Reads the Armenian named entity recognition dataset
 
-    Returns list of dictionaries, where each dictionary represents
-    a paragraph's information (text, labels, etc.)
+    Returns a list of dictionaries.
+    Each dictionary contains information
+    about a paragraph (text, labels, etc.)
     """
     with open(path, 'r') as file:
         paragraphs = [json.loads(line) for line in file]
@@ -37,7 +38,7 @@ def filter_unicode_broken_characters(text: str) -> str:
 
 def get_label(tok_start_char: int, tok_end_char: int, labels: list) -> list:
     """
-    Returns the label that corresponds to the token
+    Returns the label that corresponds to the given token
     """
     for label in labels:
         if label[0] <= tok_start_char and label[1] >= tok_end_char:
@@ -73,7 +74,7 @@ def format_sentences(paragraphs: list) -> list:
 
 def convert_to_bioes(sentences: list) -> list:
     """
-    Рeturns a list of strings where each string represents a sentence in BIOES format
+    Returns a list of strings where each string represents a sentence in BIOES format
     """
     beios_sents = []
     for sentence in tqdm(sentences):
@@ -102,8 +103,8 @@ def write_sentences_to_file(sents, filename):
 
 def train_test_dev_split(sents, base_output_path, short_name, train_fraction=0.7, dev_fraction=0.15):
     """
-    Takes in a list of sentences and splits them into training, dev, and test sets
-    Writes each set to a separate file with write_sentences_to_file
+    Splits a list of sentences into training, dev, and test sets,
+    and writes each set to a separate file with write_sentences_to_file
     """
     num = len(sents)
     train_num = int(num * train_fraction)
@@ -131,9 +132,9 @@ def convert_dataset(base_input_path, base_output_path, short_name):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input_path', type=str, default="/armtdp/ArmTDP-NER", help="Where to find input file")
-    parser.add_argument('--output_path', type=str, default="/armtdp/ArmTDP-NER/data", help="Where to output the results")
-    parser.add_argument('--short_name', type=str, default="hy_armtdp", help="Language and dataset identifier")
+    parser.add_argument('--input_path', type=str, default="/armtdp/ArmTDP-NER", help="Path to input file")
+    parser.add_argument('--output_path', type=str, default="/armtdp/ArmTDP-NER/data", help="Path to the output directory")
+    parser.add_argument('--short_name', type=str, default="hy_armtdp", help="Name to identify the dataset and the model")
     args = parser.parse_args()
 
     convert_dataset(args.input_path, args.output_path, args.short_name)
